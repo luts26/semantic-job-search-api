@@ -10,3 +10,5 @@ __pycache__/
 .env.*
 !.env.example
 !.env.smoke.example
+workua_search_page_jobs-*.html
+workua_search_page_jobs-*_files/

@@ -1,12 +1,16 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.scraper.errors import SourceAccessDeniedError
 from app.services.index_service import IndexService
 from app.services.scrape_service import ScrapeService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+logger = logging.getLogger(__name__)
 
 
 class ScrapeRunRequest(BaseModel):
@@ -51,10 +55,27 @@ def run_scrape(payload: ScrapeRunRequest, db: Session = Depends(get_db)) -> Scra
             max_pages=payload.max_pages,
         )
         return ScrapeRunResponse(**result)
-    except Exception as exc:  # pragma: no cover - boundary-level protection
+    except SourceAccessDeniedError as exc:
+        logger.warning(
+            "Source access denied during scrape",
+            extra={"source": exc.source, "status_code": exc.status_code, "reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Scraper failed: {exc}",
+            detail={
+                "error": "source_access_denied",
+                "source": exc.source,
+                "message": "The external source denied automated access. Try fixture mode or retry later.",
+            },
+        ) from exc
+    except Exception as exc:  # pragma: no cover - boundary-level protection
+        logger.exception("Scraper failed")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "error": "scraper_failed",
+                "message": "Scraper failed. Technical details were logged server-side.",
+            },
         ) from exc
 
 
@@ -65,7 +86,11 @@ def run_index(payload: IndexRunRequest, db: Session = Depends(get_db)) -> IndexR
         result = service.run(batch_size=payload.batch_size)
         return IndexRunResponse(**result)
     except Exception as exc:  # pragma: no cover - boundary-level protection
+        logger.exception("Indexing failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Indexing failed: {exc}",
+            detail={
+                "error": "indexing_failed",
+                "message": "Indexing failed. Technical details were logged server-side.",
+            },
         ) from exc

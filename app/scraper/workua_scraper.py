@@ -9,6 +9,7 @@ import httpx
 from bs4 import BeautifulSoup
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
+from app.scraper.errors import SourceAccessDeniedError
 from app.scraper.schemas import ScrapedJob
 
 
@@ -53,8 +54,18 @@ class WorkUaScraper:
     )
     def _get(self, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
         response = self._client.get(url, params=params)
+        if self._is_cloudflare_access_denied(response):
+            raise SourceAccessDeniedError(
+                source="work.ua",
+                status_code=response.status_code,
+                reason="cloudflare_mitigated_response",
+            )
         response.raise_for_status()
         return response
+
+    @staticmethod
+    def _is_cloudflare_access_denied(response: httpx.Response) -> bool:
+        return response.status_code == 403 and bool(response.headers.get("cf-mitigated"))
 
     def _human_delay(self) -> None:
         delay = random.uniform(self._min_delay, self._max_delay)
@@ -159,6 +170,63 @@ class WorkUaScraper:
             requirements_raw=requirements_raw,
             published_at=published_at,
         )
+
+    def parse_search_page_jobs(self, html: str) -> list[ScrapedJob]:
+        soup = BeautifulSoup(html, "lxml")
+        results: list[ScrapedJob] = []
+
+        for card in soup.select(".job-link"):
+            title_anchor = card.select_one('h2 a[href*="/jobs/"]')
+            if title_anchor is None:
+                continue
+
+            href = (title_anchor.get("href") or "").strip()
+            url = self._absolute_workua_url(href)
+            if not url:
+                continue
+
+            source_job_id = self._extract_job_id(url)
+            title = title_anchor.get_text(" ", strip=True)
+            company_name = self._pick_company(card, {})
+            city = self._pick_city(card, {})
+            description = self._pick_card_description(card)
+
+            if not source_job_id or not title or not company_name or not description:
+                continue
+
+            results.append(
+                ScrapedJob(
+                    source_job_id=source_job_id,
+                    url=url,
+                    title=title,
+                    company_name=company_name,
+                    city=city,
+                    employment_type=None,
+                    description_raw=description,
+                    requirements_raw=self._extract_requirements_from_text(description),
+                    published_at=None,
+                )
+            )
+
+        return results
+
+    @classmethod
+    def _absolute_workua_url(cls, href: str) -> str | None:
+        if not href:
+            return None
+        if href.startswith("/jobs/"):
+            return f"{cls.BASE_URL}{href}"
+        try:
+            return cls._ensure_workua_url(href)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _pick_card_description(card: BeautifulSoup) -> str:
+        description_node = card.select_one(".job-description") or card.select_one(".overflow.wordwrap")
+        if not description_node:
+            return ""
+        return re.sub(r"\s+", " ", description_node.get_text(" ", strip=True))
 
     @staticmethod
     def _extract_job_id(url: str) -> str | None:

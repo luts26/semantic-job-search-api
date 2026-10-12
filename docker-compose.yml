@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-semantic_jobs_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - semantic_job_search_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -48,7 +48,7 @@ services:
     image: adminer:4
     container_name: semantic_job_search_adminer
     ports:
-      - "8080:8080"
+      - "8088:8080"
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,0 +1,37 @@
+{
+  "jobs": [
+    {
+      "source_job_id": "900001",
+      "url": "https://www.work.ua/jobs/900001/",
+      "title": "Java Backend Developer",
+      "company_name": "Northstar Systems",
+      "city": "Kyiv",
+      "employment_type": "Full-time",
+      "description_raw": "Build and maintain backend services for a logistics analytics platform. The role focuses on Java, Spring Boot, PostgreSQL, REST APIs, and practical collaboration with product teams.",
+      "requirements_raw": "Java, Spring Boot, PostgreSQL, REST APIs",
+      "published_at": null
+    },
+    {
+      "source_job_id": "900002",
+      "url": "https://www.work.ua/jobs/900002/",
+      "title": "React Frontend Developer",
+      "company_name": "Blue Harbor Labs",
+      "city": "Lviv",
+      "employment_type": "Full-time",
+      "description_raw": "Develop user interfaces for a recruiting dashboard using React, TypeScript, accessible components, and API-driven workflows.",
+      "requirements_raw": "React, TypeScript, HTML, CSS",
+      "published_at": null
+    },
+    {
+      "source_job_id": "900003",
+      "url": "https://www.work.ua/jobs/900003/",
+      "title": "DevOps Engineer",
+      "company_name": "Greenline Cloud",
+      "city": "Remote",
+      "employment_type": "Full-time",
+      "description_raw": "Support cloud infrastructure, deployment automation, monitoring, and incident response for several internal SaaS products.",
+      "requirements_raw": "Docker, Kubernetes, Terraform, CI/CD",
+      "published_at": null
+    }
+  ]
+}

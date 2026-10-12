@@ -22,6 +22,9 @@ htmlcov/
 *.log
 .DS_Store
 
+workua_search_page_jobs-*.html
+workua_search_page_jobs-*_files/
+
 # Local AI coding tools
 .codex
 .codex/

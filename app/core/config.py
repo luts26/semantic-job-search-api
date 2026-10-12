@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,6 +20,8 @@ class Settings(BaseSettings):
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
     qdrant_collection_name: str = "job_vacancies"
+
+    scraper_mode: Literal["live", "fixture"] = "fixture"
 
     workua_request_timeout: float = 20.0
     workua_min_delay_seconds: float = 0.6

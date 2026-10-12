@@ -27,6 +27,7 @@ cp .env.example .env
 2. Start services:
 ```bash
 docker compose up -d --build
+docker compose exec api alembic upgrade head
 ```
 
 3. Apply migrations:
@@ -41,14 +42,25 @@ curl http://localhost:8000/health
 
 ## Data collection
 
-Run scraper for any supported Work.ua search phrase:
+The scraper has two modes:
+- `SCRAPER_MODE=fixture` (default in `.env.example`): imports fictional local demo vacancies. Use this for demos, smoke checks, and portfolio review without depending on external access.
+- `SCRAPER_MODE=live`: fetches matching vacancies from Work.ua. External sources may restrict automated access, and the API returns a structured `source_access_denied` error if access is blocked.
+
+Run scraper for any supported search phrase:
 ```bash
 curl -X POST http://localhost:8000/admin/scrape/run \
   -H "Content-Type: application/json" \
   -d '{"search_query":"Java Developer","max_pages":3}'
 ```
 
-`search_query` must be 2-100 characters. `max_pages` must be 1-30.
+`search_query` must be 2-100 characters. `max_pages` must be 1-30. In fixture mode, `search_query` is still validated but the local fictional dataset is imported.
+
+To use live mode, set:
+```env
+SCRAPER_MODE=live
+```
+
+This project does not implement CAPTCHA bypassing, Cloudflare circumvention, proxy rotation, or stealth-browser techniques.
 
 Run indexing into Qdrant:
 ```bash
