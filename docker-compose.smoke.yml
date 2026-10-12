@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: semantic_job_search_smoke_postgres
+    environment:
+      POSTGRES_DB: semantic_jobs_smoke
+      POSTGRES_USER: semantic_jobs_smoke_app
+      POSTGRES_PASSWORD: smoke_test_only
+    ports:
+      - "15432:5432"
+    volumes:
+      - semantic_job_search_smoke_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U semantic_jobs_smoke_app -d semantic_jobs_smoke"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: semantic_job_search_smoke_qdrant
+    ports:
+      - "16333:6333"
+      - "16334:6334"
+    volumes:
+      - semantic_job_search_smoke_qdrant_data:/qdrant/storage
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: semantic_job_search_smoke_api
+    env_file:
+      - .env.smoke.example
+    ports:
+      - "18000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - ./:/app
+
+volumes:
+  semantic_job_search_smoke_postgres_data:
+    name: semantic_job_search_smoke_postgres_data
+  semantic_job_search_smoke_qdrant_data:
+    name: semantic_job_search_smoke_qdrant_data

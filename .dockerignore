@@ -1,0 +1,12 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.venv/
+.env
+.env.*
+!.env.example
+!.env.smoke.example

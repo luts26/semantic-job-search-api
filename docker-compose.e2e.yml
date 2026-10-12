@@ -1,0 +1,11 @@
+services:
+  postgres:
+    ports:
+      - "15432:5432"
+  qdrant:
+    ports:
+      - "16333:6333"
+      - "16334:6334"
+  api:
+    ports:
+      - "18000:8000"

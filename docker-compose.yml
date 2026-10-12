@@ -1,0 +1,60 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: semantic_job_search_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-semantic_jobs}
+      POSTGRES_USER: ${POSTGRES_USER:-semantic_jobs_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    ports:
+      - "5432:5432"
+    volumes:
+      - semantic_job_search_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-semantic_jobs_app} -d ${POSTGRES_DB:-semantic_jobs}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: semantic_job_search_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - semantic_job_search_qdrant_data:/qdrant/storage
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: semantic_job_search_api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - ./:/app
+
+  adminer:
+    image: adminer:4
+    container_name: semantic_job_search_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  semantic_job_search_postgres_data:
+    name: semantic_job_search_postgres_data
+  semantic_job_search_qdrant_data:
+    name: semantic_job_search_qdrant_data
