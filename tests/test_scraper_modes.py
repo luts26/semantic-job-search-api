@@ -6,6 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import admin
+from app.api import search as search_api
+from app.api import security
 from app.db.session import get_db
 from app.main import app
 from app.models import Company, EmbeddingJobQueue, Job
@@ -18,6 +20,7 @@ from app.services.scrape_service import ScrapeService
 
 @dataclass(slots=True)
 class FakeSettings:
+    admin_api_key: str = "test_admin_key"
     scraper_mode: str = "fixture"
     workua_request_timeout: float = 20.0
     workua_min_delay_seconds: float = 0.0
@@ -116,11 +119,13 @@ def test_safe_api_error_response(db_session, monkeypatch):
     def override_get_db():
         yield db_session
 
+    monkeypatch.setattr(security, "get_settings", lambda: FakeSettings(admin_api_key="test_admin_key"))
     monkeypatch.setattr(admin, "ScrapeService", DeniedScrapeService)
     app.dependency_overrides[get_db] = override_get_db
     try:
         response = TestClient(app).post(
             "/admin/scrape/run",
+            headers={"X-API-Key": "test_admin_key"},
             json={"search_query": "Java Developer", "max_pages": 1},
         )
     finally:
@@ -140,3 +145,111 @@ def test_parse_sanitized_workua_search_fixture_without_network():
     assert jobs[0].company_name == "Northstar Systems"
     assert jobs[0].city == "Kyiv"
     assert "Fictional backend role" in jobs[0].description_raw
+
+
+def test_admin_endpoint_without_api_key_returns_401(monkeypatch):
+    monkeypatch.setattr(security, "get_settings", lambda: FakeSettings(admin_api_key="expected_test_key"))
+
+    response = TestClient(app).post(
+        "/admin/scrape/run",
+        json={"search_query": "Java Developer", "max_pages": 1},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "error": "unauthorized",
+            "message": "Valid API key required.",
+        }
+    }
+    assert "expected_test_key" not in response.text
+
+
+def test_admin_endpoint_wrong_api_key_returns_401(monkeypatch):
+    monkeypatch.setattr(security, "get_settings", lambda: FakeSettings(admin_api_key="expected_test_key"))
+
+    response = TestClient(app).post(
+        "/admin/scrape/run",
+        headers={"X-API-Key": "wrong_test_key"},
+        json={"search_query": "Java Developer", "max_pages": 1},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["error"] == "unauthorized"
+    assert "expected_test_key" not in response.text
+    assert "wrong_test_key" not in response.text
+
+
+def test_admin_endpoint_with_valid_api_key_passes_auth(db_session, monkeypatch):
+    class SuccessfulScrapeService:
+        def __init__(self, db):
+            del db
+
+        def run_workua_scrape(self, search_query, max_pages):
+            assert search_query == "Java Developer"
+            assert max_pages == 1
+            return {
+                "total_scraped": 3,
+                "jobs_created": 3,
+                "jobs_updated": 0,
+                "companies_created": 3,
+            }
+
+    def override_get_db():
+        yield db_session
+
+    monkeypatch.setattr(security, "get_settings", lambda: FakeSettings(admin_api_key="test_admin_key"))
+    monkeypatch.setattr(admin, "ScrapeService", SuccessfulScrapeService)
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = TestClient(app).post(
+            "/admin/scrape/run",
+            headers={"X-API-Key": "test_admin_key"},
+            json={"search_query": "Java Developer", "max_pages": 1},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["total_scraped"] == 3
+    assert "test_admin_key" not in response.text
+
+
+def test_health_is_public_without_api_key():
+    response = TestClient(app).get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_search_is_public_without_admin_dependency(db_session, monkeypatch):
+    class FakeSearchService:
+        def __init__(self, db):
+            del db
+
+        def search(self, query, limit, city=None, company=None, role_category=None):
+            return {
+                "query": query,
+                "applied_filters": {
+                    "city": city,
+                    "company": company,
+                    "role_category": role_category,
+                },
+                "results": [],
+            }
+
+    def override_get_db():
+        yield db_session
+
+    monkeypatch.setattr(search_api, "SearchService", FakeSearchService)
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = TestClient(app).post(
+            "/search",
+            json={"query": "Java backend developer", "limit": 10},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["query"] == "Java backend developer"

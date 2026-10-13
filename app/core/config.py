@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "Semantic Job Search API"
     app_env: str = "development"
     app_debug: bool = False
+    admin_api_key: str = "change_me"
 
     postgres_db: str = "semantic_jobs"
     postgres_user: str = "semantic_jobs_app"

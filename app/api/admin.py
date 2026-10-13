@@ -5,11 +5,12 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.api.security import require_admin_api_key
 from app.scraper.errors import SourceAccessDeniedError
 from app.services.index_service import IndexService
 from app.services.scrape_service import ScrapeService
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_api_key)])
 logger = logging.getLogger(__name__)
 
 
